@@ -6,6 +6,71 @@ dedicated-server image, with a real server console and nightly encrypted backups
 Config lives in git; worlds and mods live outside it. Nothing host-specific is committed —
 paths, ports, versions and ownership all come from `.env`.
 
+## Quick start
+
+Full explanations follow; this is the whole deployment in order. `<config>` is the repo
+checkout (e.g. `/opt/terraria`), `<data>` is the world directory (e.g. `/srv/terraria`),
+`<admin>` is your own account.
+
+```sh
+# 1. Service account. Note the uid/gid it gets.
+sudo useradd --create-home --home-dir <data> --shell /usr/sbin/nologin terraria
+id terraria
+
+# 2. Config directory, owned by you — not by the service account.
+sudo mkdir -p <config> && sudo chown <admin>:<admin> <config>
+git clone <repo-url> <config>
+cd <config>
+cp .env.example .env
+$EDITOR .env                    # TMLVERSION, TML_UID, TML_GID, DATA_DIR, TML_PORT
+
+# 3. Server settings. Lives in <data>, not the repo — it holds the password.
+sudo cp serverconfig.example.txt <data>/serverconfig.txt
+sudo chown terraria:terraria <data>/serverconfig.txt
+sudo chmod 600 <data>/serverconfig.txt
+sudo $EDITOR <data>/serverconfig.txt          # set password=
+
+# 4. Build and run. TML_UID/TML_GID are build args — get them right before this.
+sudo docker compose build
+sudo docker compose up -d
+sudo docker compose logs -f                   # world generation takes a few minutes
+
+# 5. Console. Detach with Ctrl-P Ctrl-Q; Ctrl-C stops the server.
+sudo docker attach terraria
+```
+
+Backups are a separate sequence — see [`backup/README.md`](backup/README.md).
+
+## Git access on the server
+
+Cloning a public repo over HTTPS needs no credentials, and `git pull` keeps working. That is
+enough if changes are authored elsewhere and the server only consumes them, which is the
+recommended flow.
+
+To commit *from* the server, **generate a new key there** — never copy a personal private
+key onto a host:
+
+```sh
+ssh-keygen -t ed25519 -f ~/.ssh/github-terraria -N "" -C "server deploy key"
+cat ~/.ssh/github-terraria.pub      # add to the repo's Deploy keys, with write access
+```
+
+```
+# ~/.ssh/config
+Host github-terraria
+    HostName github.com
+    User git
+    IdentityFile ~/.ssh/github-terraria
+    IdentitiesOnly yes
+```
+
+Then set the remote to `github-terraria:<owner>/<repo>.git`. The plain `git@github.com:...`
+form matches no `Host` block, so ssh ignores the `IdentityFile` and fails with
+`Permission denied (publickey)` even though the key is registered correctly.
+
+A deploy key is scoped to one repository, so a compromise of this host cannot reach your
+other repos — which a personal key or an account-wide token would.
+
 ## Why the upstream image
 
 tModLoader ships a `Dockerfile` and management script in its own repository. Compared with
