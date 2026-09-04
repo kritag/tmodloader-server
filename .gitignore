@@ -1,0 +1,11 @@
+# Host-specific values and secrets — never commit
+.env
+# holds the server password; belongs in the data directory
+serverconfig.txt
+
+# Runtime state. NB: no bare "backup/" here — that would ignore the backup scripts.
+data/
+tModLoader/
+*.wld
+*.bak
+*.twld

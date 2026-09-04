@@ -1,0 +1,33 @@
+# Copy to <data>/serverconfig.txt and edit. NOT to the repo — it holds the password.
+# Paths below are container-internal; <data> is mounted at /tModLoader.
+
+# Port INSIDE the container. Leave at 7777 and change the published port via
+# TML_PORT in .env instead.
+port=7777
+
+# Terraria has no account system. This password is the only access control on a
+# port open to the internet. Do not leave it blank.
+password=CHANGE-ME
+
+maxplayers=8
+motd=Welcome!
+
+# Cheat protection.
+secure=1
+
+# Where worlds live, and which one to load.
+worldpath=/tModLoader/Worlds
+world=/tModLoader/Worlds/World.wld
+
+# Used ONLY when the world named above does not yet exist. Changing them later
+# has no effect on an existing world.
+#   autocreate:  1 = small, 2 = medium, 3 = large
+#   difficulty:  0 = normal, 1 = expert, 2 = master, 3 = journey
+autocreate=3
+difficulty=1
+worldname=World
+seed=
+
+language=en-US
+npcstream=60
+upnp=0

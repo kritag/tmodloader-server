@@ -1,0 +1,35 @@
+services:
+  tml:
+    container_name: terraria
+    restart: unless-stopped
+
+    build:
+      context: .
+      args:
+        # Pin the tModLoader release. Unset builds the latest GitHub release, which
+        # means a rebuild can silently move versions — and a world saved by a newer
+        # build will not open on an older one.
+        TMLVERSION: ${TMLVERSION}
+        # Baked at build time, not runtime (upstream limitation). Match these to the
+        # host account that should own the world files, or everything lands as uid
+        # 1000 regardless of who runs the stack.
+        UID: ${TML_UID}
+        GID: ${TML_GID}
+
+    ports:
+      - "${TML_PORT}:7777"
+
+    # Both required for `docker attach` to give a usable server console.
+    tty: true
+    stdin_open: true
+
+    # The world is written on shutdown. Docker's default 10s SIGTERM grace is not
+    # enough for a large modded world, and being killed mid-write is how saves get
+    # corrupted.
+    stop_grace_period: 120s
+
+    volumes:
+      - ${DATA_DIR}:/tModLoader
+
+    logging:
+      driver: journald
