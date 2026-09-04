@@ -1,0 +1,65 @@
+#!/bin/bash
+# Interactive server console. Runs on the HOST:
+#
+#   sudo install -m 755 bin/terraria-console /usr/local/bin/
+#   terraria-console
+#
+# Type commands, see server output, and press Ctrl-C or Ctrl-D to leave. Ctrl-C stops
+# THIS script only — the server never receives the signal, because this is just a client
+# writing to the container's stdin pipe. That is the whole reason the server reads from a
+# FIFO instead of a TTY.
+set -uo pipefail
+
+CONTAINER="${TERRARIA_CONTAINER:-terraria}"
+SHOW_LOGS=1
+
+[ "${1:-}" = "-q" ] && SHOW_LOGS=0
+
+if [ -z "$(docker ps -q -f "name=^${CONTAINER}$")" ]; then
+  echo "error: container '$CONTAINER' is not running" >&2
+  exit 1
+fi
+
+logpid=""
+cleanup() {
+  [ -n "$logpid" ] && kill "$logpid" 2>/dev/null
+  echo
+  echo "Console closed. The server is still running."
+  exit 0
+}
+trap cleanup INT TERM
+
+if [ "$SHOW_LOGS" -eq 1 ]; then
+  docker logs -f --since 0s "$CONTAINER" 2>&1 &
+  logpid=$!
+fi
+
+cat <<'BANNER'
+Terraria console. Commands are sent to the running server.
+  Ctrl-C / Ctrl-D   leave the console (server keeps running)
+  !exit             actually shut the server down
+Try: playing, save, say hello
+BANNER
+
+while IFS= read -r -e -p $'\nterraria> ' line; do
+  [ -z "$line" ] && continue
+  history -s "$line"
+
+  case "$line" in
+    # `exit` is a real Terraria command that shuts the server down. Someone typing it to
+    # leave this client would kill the server by accident, so it is intercepted and the
+    # real thing needs the explicit `!exit`.
+    exit|quit|q)
+      cleanup
+      ;;
+    '!exit')
+      echo "Shutting the server down..."
+      docker exec "$CONTAINER" tcon exit
+      continue
+      ;;
+  esac
+
+  docker exec "$CONTAINER" tcon "$line" || echo "failed to send: $line" >&2
+done
+
+cleanup

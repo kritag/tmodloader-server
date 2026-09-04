@@ -1,0 +1,19 @@
+#!/bin/bash
+# Send a command to the running server console.
+#   docker exec terraria tcon save
+#   docker exec terraria tcon "say Restarting in 5 minutes"
+set -euo pipefail
+
+FIFO=/tmp/tml-console
+
+if [ "$#" -eq 0 ]; then
+  echo "usage: tcon <command...>" >&2
+  exit 2
+fi
+
+if [ ! -p "$FIFO" ]; then
+  echo "error: $FIFO is not a pipe — is the server running under tml-entrypoint.sh?" >&2
+  exit 1
+fi
+
+echo "$*" > "$FIFO"

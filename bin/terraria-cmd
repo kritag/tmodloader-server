@@ -1,0 +1,19 @@
+#!/bin/bash
+# Optional HOST-side convenience wrapper. Unlike the other scripts in this directory,
+# this one is installed on the host, not mounted into the container:
+#
+#   sudo install -m 755 bin/terraria-cmd /usr/local/bin/
+#
+# Then:  terraria-cmd save
+#        terraria-cmd "say Restarting in 5 minutes"
+set -euo pipefail
+
+CONTAINER="${TERRARIA_CONTAINER:-terraria}"
+
+if [ "$#" -eq 0 ]; then
+  echo "usage: terraria-cmd <command...>" >&2
+  echo "       terraria-cmd save" >&2
+  exit 2
+fi
+
+exec docker exec "$CONTAINER" tcon "$*"

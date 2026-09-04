@@ -35,8 +35,9 @@ sudo docker compose build
 sudo docker compose up -d
 sudo docker compose logs -f                   # world generation takes a few minutes
 
-# 5. Console. Detach with Ctrl-P Ctrl-Q; Ctrl-C stops the server.
-sudo docker attach terraria
+# 5. Console. Ctrl-C is safe — you are never attached to the server's terminal.
+sudo docker exec terraria tcon playing
+sudo docker compose logs -f
 ```
 
 Backups are a separate sequence — see [`backup/README.md`](backup/README.md).
@@ -194,30 +195,96 @@ First start generates a world, which takes a few minutes for a large one.
 
 ## The server console
 
+### What is in `bin/`
+
+Two of these run *inside* the container and are never invoked directly; the third is
+optional sugar for the host.
+
+| Script | Runs | How it gets there | You invoke it? |
+|---|---|---|---|
+| `tml-entrypoint.sh` | in the container | mounted read-only, set as `entrypoint:` | no — Docker runs it |
+| `tcon` | in the container | mounted read-only onto the container's `PATH` | via `docker exec` |
+| `terraria-cmd` | on the host | you install it, optional | yes — one command at a time |
+| `terraria-console` | on the host | you install it, optional | yes — interactive session |
+
+Nothing needs installing for the console to work — the compose file mounts the first two,
+so they are in place as soon as the stack is up.
+
+### Interactive console
+
 ```sh
-sudo docker attach terraria
+sudo install -m 755 bin/terraria-console /usr/local/bin/
+terraria-console
 ```
 
-This works even though the service account has `nologin`. `docker attach` connects to the
-container's stdin/stdout, not to a host login session — you run it as any user with Docker
-access. The host account's shell governs only whether you can log in *as* `terraria`, which
-nothing here requires. Inside the container the server runs as its own `tml` user;
-`TML_UID`/`TML_GID` exist solely so files written to the bind mount get the right ownership
-on the host.
+Type commands, watch output, leave with **Ctrl-C or Ctrl-D — the server keeps running.**
+That works because this is a client writing into the container's stdin pipe, not a terminal
+attached to the server process, so the signal never reaches the server.
 
-**Detach with `Ctrl-P` then `Ctrl-Q`.** `Ctrl-C` stops the server — and with
-`restart: unless-stopped` it will not come back on its own, because a deliberate stop is
-not a failure. If that happens: `docker compose start`.
+`exit` is intercepted: it is a real Terraria command that shuts the server down, and typing
+it to leave the console would be an unpleasant surprise. Use `!exit` when you genuinely mean
+to stop the server.
 
-Useful console commands: `save`, `playing`, `kick <player>`, `ban <player>`, `say <msg>`,
-`exit` (saves and shuts down).
+Server output streams into the same window, so it interleaves with your prompt. Pass `-q` to
+suppress it and keep `docker compose logs -f` in a second terminal if you prefer them apart.
 
-Read-only alternative that cannot accidentally stop anything:
+### Sending commands
+
+The server's stdin is a named pipe, not a TTY. Send commands with `tcon`:
 
 ```sh
-docker compose logs -f
+sudo docker exec terraria tcon save
+sudo docker exec terraria tcon "say Restarting in 5 minutes"
+sudo docker exec terraria tcon playing
+```
+
+`tcon` lives on the container's `PATH`, which is why it is `tcon` and not a path.
+
+Optionally install the host wrapper to shorten that:
+
+```sh
+sudo install -m 755 bin/terraria-cmd /usr/local/bin/
+terraria-cmd save
+terraria-cmd "say Restarting in 5 minutes"
+```
+
+Watch the output separately:
+
+```sh
+sudo docker compose logs -f
 journalctl CONTAINER_NAME=terraria -f
 ```
+
+**Ctrl-C is safe here.** It stops your log viewer and nothing else, because you are not
+attached to the server's terminal — that is the entire point of this arrangement.
+
+Upstream's default is `tty: true` plus `docker attach`, where Ctrl-C travels in-band to the
+container's line discipline and stops the server; with `restart: unless-stopped` it stays
+down, because a deliberate stop is not a failure. Feeding stdin from a FIFO removes the
+interactive session altogether, and makes commands scriptable as a bonus.
+
+Signals are wired up too:
+
+| Signal | Effect |
+|---|---|
+| `SIGHUP` | flush the world to disk without stopping — `docker kill --signal=HUP terraria` |
+| `SIGTERM` | announce in chat, then `exit` cleanly so the world is written |
+
+Useful console commands: `save`, `playing`, `kick <player>`, `ban <player>`, `say <msg>`,
+`exit`.
+
+### Reverting to upstream's attach console
+
+If the wrapper ever breaks against a new tModLoader release, fall back by removing the
+`entrypoint:` line and the two `./bin/...` mounts from `docker-compose.yaml`, and restoring:
+
+```yaml
+    tty: true
+    stdin_open: true
+```
+
+Then the console is `sudo docker attach terraria`, detaching with **Ctrl-P Ctrl-Q** — and
+Ctrl-C stops the server.
 
 ## Mods
 

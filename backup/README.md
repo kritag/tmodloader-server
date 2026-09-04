@@ -23,6 +23,12 @@ at 05:00 is a cheap price for certainty.
 `stop_grace_period: 120s` in the compose file allows the write to finish; Docker's 10s
 default would kill a large modded world mid-save.
 
+The console wrapper does expose a no-downtime alternative — `docker kill --signal=HUP
+terraria` asks the server to flush the world while it keeps running. It is not used here
+because the server gives no signal that the save has *finished*, so the script would be
+sleeping an arbitrary interval and hoping. If uptime matters more than certainty to you,
+swap the `stop`/`start` pair for a `HUP` and a generous sleep, and know what you traded.
+
 The script traps `EXIT` and restarts the server however it exits, so a failed backup cannot
 leave the server down overnight. A failed *restart* is treated as a failed run rather than
 being swallowed — otherwise the alert would say everything was fine while the server was

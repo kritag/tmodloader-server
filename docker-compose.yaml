@@ -19,9 +19,10 @@ services:
     ports:
       - "${TML_PORT}:7777"
 
-    # Both required for `docker attach` to give a usable server console.
-    tty: true
-    stdin_open: true
+    # Deliberately NO tty/stdin_open. The server's stdin comes from a FIFO instead
+    # (see bin/tml-entrypoint.sh), so there is no interactive session for a stray
+    # Ctrl-C to stop. Commands go in with `tcon`, output comes out via `docker logs`.
+    entrypoint: ["/bin/bash", "/usr/local/bin/tml-entrypoint.sh"]
 
     # The world is written on shutdown. Docker's default 10s SIGTERM grace is not
     # enough for a large modded world, and being killed mid-write is how saves get
@@ -30,6 +31,10 @@ services:
 
     volumes:
       - ${DATA_DIR}:/tModLoader
+      # Mounted read-only rather than baked in, so the upstream Dockerfile stays
+      # untouched and these can be edited without a rebuild.
+      - ./bin/tml-entrypoint.sh:/usr/local/bin/tml-entrypoint.sh:ro
+      - ./bin/tcon:/usr/local/bin/tcon:ro
 
     logging:
       driver: journald
