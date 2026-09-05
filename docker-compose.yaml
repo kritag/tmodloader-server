@@ -19,9 +19,14 @@ services:
     ports:
       - "${TML_PORT}:7777"
 
-    # Deliberately NO tty/stdin_open. The server's stdin comes from a FIFO instead
-    # (see bin/tml-entrypoint.sh), so there is no interactive session for a stray
-    # Ctrl-C to stop. Commands go in with `tcon`, output comes out via `docker logs`.
+    # tty allocates a pty for stdout ONLY. Without it, the server's carriage-return
+    # progress output (worldgen, saves) buffers until the next newline, so the log
+    # lags reality badly — "Server started" can appear minutes after it did.
+    #
+    # This does NOT reintroduce the Ctrl-C hazard: the entrypoint pipes the server's
+    # stdin from a FIFO, so the server never reads the pty. There is no stdin_open,
+    # so `docker attach` has nothing useful to offer — use `terraria-console`.
+    tty: true
     entrypoint: ["/bin/bash", "/usr/local/bin/tml-entrypoint.sh"]
 
     # The world is written on shutdown. Docker's default 10s SIGTERM grace is not

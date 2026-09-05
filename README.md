@@ -13,8 +13,9 @@ checkout (e.g. `/opt/terraria`), `<data>` is the world directory (e.g. `/srv/ter
 `<admin>` is your own account.
 
 ```sh
-# 1. Service account. Note the uid/gid it gets.
-sudo useradd --create-home --home-dir <data> --shell /usr/sbin/nologin terraria
+# 1. Service account — no home; <data> is a data directory, not a home directory.
+sudo useradd --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin terraria
+sudo mkdir -p <data> && sudo chown terraria:terraria <data>
 id terraria
 
 # 2. Config directory, owned by you — not by the service account.
@@ -119,12 +120,19 @@ The container runs as a fixed uid/gid, so the host needs an account for the worl
 belong to. Create it before the first build — the ids are baked in at build time.
 
 ```sh
-sudo useradd --create-home --home-dir /srv/terraria \
+sudo useradd --no-create-home --home-dir /nonexistent \
              --shell /usr/sbin/nologin terraria
+sudo mkdir -p <data>
+sudo chown terraria:terraria <data>
 id terraria
 ```
 
 Put the resulting uid and gid in `.env` as `TML_UID` / `TML_GID`.
+
+**The account gets no home directory, and `<data>` is not one.** A `nologin` account that
+exists only to own files does not need a home. Making the data directory into one copies
+`/etc/skel` dotfiles in beside your worlds, which the backup then sweeps up — the same class
+of problem as rooting a git repo in a home directory.
 
 **Let it take a normal uid (1000+), not a system one.** `useradd --system` allocates below
 1000, which hides the account from the usual `awk -F: '$3 >= 1000'` audit of human
@@ -139,7 +147,7 @@ service account to it hands that reach to the account most exposed to the intern
 Manage the stack as an admin instead:
 
 ```sh
-sudo docker compose -f /opt/terraria/docker-compose.yaml --project-directory /opt/terraria ps
+sudo docker compose -f <config>/docker-compose.yaml --project-directory <config> ps
 ```
 
 ### Who owns what
@@ -164,9 +172,9 @@ owned by it — give the account `--shell /bin/bash`, add it to `docker`, and le
 service with an unauthenticated port open to the internet, the split above is the safer
 default; for something behind auth it matters less.
 
-The home directory is the *data* directory here, which is why the config lives elsewhere:
-a repo rooted in a home directory sweeps up `.ssh` and shell history on `git add -A`, and
-`git clean -fdx` there deletes ignored files — which is the world.
+The config directory is kept out of both: a repo rooted in a home or data directory sweeps up
+stray files on `git add -A`, and `git clean -fdx` there deletes ignored files — which is the
+world.
 
 ## Setup
 
@@ -285,6 +293,36 @@ If the wrapper ever breaks against a new tModLoader release, fall back by removi
 
 Then the console is `sudo docker attach terraria`, detaching with **Ctrl-P Ctrl-Q** — and
 Ctrl-C stops the server.
+
+## Updating tModLoader
+
+`TMLVERSION` is a **build argument, not a runtime variable**. Editing `.env` and running
+`docker compose up -d` changes nothing — the version is compiled into the image. The same
+applies to `TML_UID` and `TML_GID`.
+
+```sh
+cd <config>
+$EDITOR .env                       # set TMLVERSION
+sudo docker compose build
+sudo docker compose up -d
+sudo docker compose logs --tail 20 # confirm the version in the startup banner
+```
+
+If the build appears to succeed but the version does not change, Docker reused a cached
+layer:
+
+```sh
+sudo docker compose build --no-cache
+```
+
+**Take a backup first.** A world saved by a newer tModLoader will not open on an older one,
+so an upgrade is effectively one-way — if the new version misbehaves, rolling the tag back
+leaves you with a world the older build refuses to load. Mods may also need updating to
+match; a mod built against an older release can fail to load or break the world it is in.
+
+```sh
+sudo /usr/local/sbin/terraria-backup.sh
+```
 
 ## Mods
 
