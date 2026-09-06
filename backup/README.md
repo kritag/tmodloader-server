@@ -17,10 +17,10 @@ openssl rand -base64 32 | sudo tee /root/.restic-terraria-password
 sudo chmod 600 /root/.restic-terraria-password
 
 sudo tee /root/.restic-terraria-env >/dev/null <<'ENV'
-export RESTIC_REPOSITORY=rclone:<remote>:<path>
+export RESTIC_REPOSITORY=rclone:<remote>:restic-terraria
 export RESTIC_PASSWORD_FILE=/root/.restic-terraria-password
-export CONFIG_DIR=<config>
-export DATA_DIR=<data>
+export CONFIG_DIR=/opt/terraria
+export DATA_DIR=/srv/terraria
 ENV
 sudo chmod 600 /root/.restic-terraria-env
 sudo -E bash -c '. /root/.restic-terraria-env && restic init'
@@ -59,7 +59,7 @@ rm -rf /tmp/restore-test
 ```sh
 sudo docker compose stop
 sudo -E bash -c '. /root/.restic-terraria-env && restic restore latest --target /'
-sudo chown -R terraria:terraria <data>
+sudo chown -R terraria:terraria /srv/terraria
 sudo docker compose start
 ```
 
@@ -78,7 +78,7 @@ stopped reporting. Absent file disables alerting silently.
 ## Notes
 
 - In: `Worlds/`, `Mods/` (incl. `install.txt`, `enabled.json`), `ModConfigs/`,
-  and `<config>` with its `.env` — which is gitignored, so this is its only
+  and `/opt/terraria` with its `.env` — which is gitignored, so this is its only
   copy.
 - Out: `server/` (rebuilt from the image), `steamapps/` (re-downloaded), logs.
 - Retention 14 daily / 8 weekly / 6 monthly. Griefed bases and corrupt saves get

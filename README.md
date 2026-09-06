@@ -5,28 +5,28 @@ Interactive console, nightly encrypted backups.
 
 | Path | What | Owner |
 |---|---|---|
-| `<config>` | this repo — compose, `.env`, scripts | your admin user |
-| `<data>` | worlds, mods, `serverconfig.txt` | `terraria` |
+| `/opt/terraria` | this repo — compose, `.env`, scripts | your admin user |
+| `/srv/terraria` | worlds, mods, `serverconfig.txt` | `terraria` |
 
 ## Install
 
 ```sh
-# Service account. No home — <data> is a data dir, not a home dir.
+# Service account. No home — /srv/terraria is a data dir, not a home dir.
 sudo useradd --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin terraria
-sudo mkdir -p <data> && sudo chown terraria:terraria <data>
+sudo mkdir -p /srv/terraria && sudo chown terraria:terraria /srv/terraria
 id terraria                                    # -> TML_UID / TML_GID
 
 # Config, owned by you. Public repo, so HTTPS clone needs no credentials.
-sudo mkdir -p <config> && sudo chown "$USER:$USER" <config>
-git clone <repo-url> <config> && cd <config>
+sudo mkdir -p /opt/terraria && sudo chown "$USER:$USER" /opt/terraria
+git clone https://github.com/kritag/tmodloader-server.git /opt/terraria && cd /opt/terraria
 cp .env.example .env && $EDITOR .env
 
-# Server settings. Holds the password, so it lives in <data>, not here.
-sudo install -o terraria -g terraria -m 600 serverconfig.example.txt <data>/serverconfig.txt
-sudo $EDITOR <data>/serverconfig.txt           # set password=
+# Server settings. Holds the password, so it lives in /srv/terraria, not here.
+sudo install -o terraria -g terraria -m 600 serverconfig.example.txt /srv/terraria/serverconfig.txt
+sudo $EDITOR /srv/terraria/serverconfig.txt           # set password=
 
-sudo mkdir -p <data>/Mods
-sudo install -o terraria -g terraria -m 644 install.txt enabled.json <data>/Mods/
+sudo mkdir -p /srv/terraria/Mods
+sudo install -o terraria -g terraria -m 644 install.txt enabled.json /srv/terraria/Mods/
 
 sudo docker compose build
 sudo docker compose up -d && sudo docker compose logs -f
@@ -51,15 +51,15 @@ In the console, `exit` closes the client; `!exit` shuts the server down.
 `install.txt` = Workshop IDs. `enabled.json` = mod internal names. Generate both with
 **Workshop → Mod Packs → Save Enabled as New Mod Pack** in the client — internal names are
 not shown on Workshop pages, so hand-writing `enabled.json` is guesswork. The tracked copies
-here are the record; the server reads them from `<data>/Mods/` and re-downloads on every start.
+here are the record; the server reads them from `/srv/terraria/Mods/` and re-downloads on every start.
 
 ```sh
 sudo /usr/local/sbin/terraria-backup.sh        # removing a content mod breaks a world that used it
-sudo install -o terraria -g terraria -m 644 install.txt enabled.json <data>/Mods/
+sudo install -o terraria -g terraria -m 644 install.txt enabled.json /srv/terraria/Mods/
 sudo docker compose restart
 ```
 
-Non-Workshop mods: drop the `.tmod` in `<data>/Mods/` and add its internal name to `enabled.json`.
+Non-Workshop mods: drop the `.tmod` in `/srv/terraria/Mods/` and add its internal name to `enabled.json`.
 
 ## Update tModLoader
 

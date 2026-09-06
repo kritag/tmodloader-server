@@ -1,5 +1,5 @@
-# Copy to <data>/serverconfig.txt and edit. NOT to the repo — it holds the password.
-# Paths below are container-internal; <data> is mounted at /tModLoader.
+# Copy to /srv/terraria/serverconfig.txt and edit. NOT into the repo — it holds the password.
+# Paths below are container-internal; /srv/terraria is mounted at /tModLoader.
 
 # Port INSIDE the container. Leave at 7777 and change the published port via
 # TML_PORT in .env instead.
